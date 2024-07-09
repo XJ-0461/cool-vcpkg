@@ -648,7 +648,7 @@ macro(_cool_vcpkg_set_up_vcpkg)
     )
 
     set(options COLLECT_METRICS)
-    set(oneValueArgs DEFAULT_TRIPLET CHAIN_LOAD_TOOLCHAIN)
+    set(oneValueArgs ROOT_DIRECTORY DEFAULT_TRIPLET CHAIN_LOAD_TOOLCHAIN)
     set(multiValueArgs OVERLAY_PORT_LOCATIONS)
     cmake_parse_arguments(bootstrap_vcpkg "${options}" "${oneValueArgs}" "${multiValueArgs}" "${args}")
 
