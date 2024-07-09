@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.28)
 include_guard(GLOBAL)
 
 # When including this module, check that we are up-to-date (as long as the user has not opted out of it)
-set(_cool_vcpkg_version 0.1.0 CACHE INTERNAL "Version of the cool-vcpkg CMake module" FORCE)
+set(_cool_vcpkg_version 0.1.1 CACHE INTERNAL "Version of the cool-vcpkg CMake module" FORCE)
 
 option(COOL_VCPKG_ENABLED "Enable the cool-vcpkg CMake module" ON)
 option(COOL_VCPKG_CHECK_FOR_UPDATES "Enable checking for latest updates from the github repository" ON)
