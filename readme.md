@@ -65,7 +65,7 @@ include(FetchContent)
 FetchContent_Declare(
         cool_vcpkg_latest
         GIT_REPOSITORY  https://github.com/XJ-0461/cool-vcpkg.git
-        GIT_TAG         latest
+        GIT_TAG         v0.1.2
         SOURCE_SUBDIR   automatic-setup
 )
 FetchContent_MakeAvailable(cool_vcpkg_latest)
@@ -174,6 +174,8 @@ cool_vcpkg_DeclarePackage(
         [CRT_LINKAGE <linkage>]
         [LIBRARY_LINKAGE <linkage>]
         [VERSION <version>]
+        [FEATURES <feature>...]
+        [USE_DEFAULT_FEATURES ON|OFF]
 )
 ```
 
@@ -187,8 +189,8 @@ developer experience, documentation, logging, and error messages.
 CMake doesn't do the whole 'public' and 'private' functions and variables thing.
 
 - Public members are prefixed with `cool_vcpkg_` and `PascalCase` names.
-- Private members have a leading underscore `_cool_vcpkg_` (leading underscore) and `lower_snake_case` names.
-- Options follow the typical CMake `SCREAMING_SNAKE_CASE` convention and are prefixed with `COOL_VCPKG_`.
+- Private members have a leading underscore `_cool_vcpkg_` and `lower_snake_case` names.
+- Options are prefixed with `COOL_VCPKG_` and follow the typical CMake `SCREAMING_SNAKE_CASE` convention.
 
 ## Todo
 
