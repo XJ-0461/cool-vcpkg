@@ -186,15 +186,17 @@ function(_cool_vcpkg_check_latest_release_info)
 
     if (NOT DEFINED _cool_vcpkg_latest_version OR _cool_vcpkg_latest_version STREQUAL "")
         set(api_url "https://api.github.com/repos/XJ-0461/cool-vcpkg/releases/latest")
-        file(DOWNLOAD ${api_url} ${CMAKE_CURRENT_BINARY_DIR}/cool_vcpkg_latest_release_info.json
-                STATUS download_status
-                TIMEOUT 10
+        file(
+            DOWNLOAD ${api_url} ${CMAKE_CURRENT_BINARY_DIR}/cool_vcpkg_latest_release_info.json
+            STATUS download_status
+            TIMEOUT 10
         )
         file(READ ${CMAKE_CURRENT_BINARY_DIR}/cool_vcpkg_latest_release_info.json latest_release_info)
-        string(JSON latest_version_string
-                ERROR_VARIABLE latest_version_string_error
-                GET "${latest_release_info}"
-                "tag_name"
+        string(
+            JSON latest_version_string
+            ERROR_VARIABLE latest_version_string_error
+            GET "${latest_release_info}"
+            "tag_name"
         )
         if (NOT latest_version_string STREQUAL "NOTFOUND")
             string(SUBSTRING "${latest_version_string}" 1 -1 latest_version_string)
@@ -203,7 +205,7 @@ function(_cool_vcpkg_check_latest_release_info)
         endif()
 
         set(_cool_vcpkg_latest_version "${latest_version_string}" CACHE INTERNAL
-                "The latest version of cool-vcpkg from the github repo. Defaults to 0.0.0 if there was an error" FORCE
+            "The latest version of cool-vcpkg from the github repo. Defaults to 0.0.0 if there was an error" FORCE
         )
     endif()
 
@@ -225,7 +227,7 @@ endmacro()
 function(_cool_vcpkg_write_vcpkg_configuration_file)
 
     _cool_vcpkg_check_guarded(ARGUMENTS ${ARGV} PUBLIC_FUNCTION_NAME "cool_vcpkg_WriteVcpkgConfigurationFile"
-            PRIVATE_FUNCTION_NAME "_cool_vcpkg_write_vcpkg_configuration_file" OUTPUT_VARIABLE args
+        PRIVATE_FUNCTION_NAME "_cool_vcpkg_write_vcpkg_configuration_file" OUTPUT_VARIABLE args
     )
 
     set(multiValueArgs OVERLAY_TRIPLETS_PATHS)
@@ -234,16 +236,11 @@ function(_cool_vcpkg_write_vcpkg_configuration_file)
     set(config_file "")
     _cool_vcpkg_code_stream(SET_INDENT_SIZE VARIABLE config_file INDENT_SIZE 4)
     _cool_vcpkg_code_stream(INCREMENT_INDENT APPEND VARIABLE config_file
-            VALUE "{\n\"$schema\": \"https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg-configuration.schema.json\",\n\"overlay-triplets\": ["
+        VALUE "{\n\"$schema\": \"https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg-configuration.schema.json\",\n\"overlay-triplets\": ["
     )
     _cool_vcpkg_code_stream(INCREMENT_INDENT APPEND VARIABLE config_file VALUE "\n")
 
     # Vcpkg Configuration section
-    list(LENGTH vcpkg_config_file_OVERLAY_TRIPLETS_PATHS overlay_triplets_count)
-    if (overlay_triplets_count GREATER 0)
-        set(actually_create_file TRUE)
-    endif()
-
     set(append_comma FALSE)
     foreach (overlay_triplet_path IN LISTS vcpkg_config_file_OVERLAY_TRIPLETS_PATHS)
         if (append_comma)
@@ -256,10 +253,11 @@ function(_cool_vcpkg_write_vcpkg_configuration_file)
     _cool_vcpkg_code_stream(DECREMENT_INDENT APPEND VARIABLE config_file VALUE "\n}")
 
     _cool_vcpkg_code_stream(GET VARIABLE config_file OUTPUT_VARIABLE config_file_output)
-    fiLe(CONFIGURE
-            OUTPUT ${_cool_vcpkg_manifest_path}/vcpkg-configuration.json
-            CONTENT "${config_file_output}"
-            @ONLY
+    fiLe(
+        CONFIGURE
+        OUTPUT ${_cool_vcpkg_manifest_path}/vcpkg-configuration.json
+        CONTENT "${config_file_output}"
+        @ONLY
     )
 
 endfunction()
@@ -274,16 +272,20 @@ endmacro()
 function(_cool_vcpkg_write_vcpkg_manifest_file)
 
     _cool_vcpkg_check_guarded(ARGUMENTS ${ARGV} PUBLIC_FUNCTION_NAME "cool_vcpkg_WriteVcpkgManifestFile"
-            PRIVATE_FUNCTION_NAME "_cool_vcpkg_write_vcpkg_manifest_file" OUTPUT_VARIABLE args
+        PRIVATE_FUNCTION_NAME "_cool_vcpkg_write_vcpkg_manifest_file" OUTPUT_VARIABLE args
     )
 
     set(oneValueArgs BUILTIN_BASELINE)
-    set(multiValueArgs TARGETS VERSION_MULTIMAP FEATURE_MULTIMAP OVERLAY_TRIPLETS_PATHS)
+    set(multiValueArgs TARGETS OVERLAY_TRIPLETS_PATHS)
     cmake_parse_arguments(write_vcpkg_manifest_file "${options}" "${oneValueArgs}" "${multiValueArgs}" ${args})
 
     set(builtin_baseline "f7423ee180c4b7f40d43402c2feb3859161ef625")
     if (NOT _cool_vcpkg_current_commit_hash STREQUAL "")
         set(builtin_baseline "${_cool_vcpkg_current_commit_hash}")
+    else()
+        message(WARNING "No commit hash could be determined for the current vcpkg checkout. This shouldn't be the case."
+                "Using builtin-baseline '${builtin_baseline}' a commit from June 14, 2024"
+        )
     endif()
     if (DEFINED write_vcpkg_manifest_file_BUILTIN_BASELINE AND NOT write_vcpkg_manifest_file_BUILTIN_BASELINE STREQUAL "")
         set(builtin_baseline "${write_vcpkg_manifest_file_BUILTIN_BASELINE}")
@@ -292,35 +294,49 @@ function(_cool_vcpkg_write_vcpkg_manifest_file)
     set(manifest "")
     _cool_vcpkg_code_stream(SET_INDENT_SIZE VARIABLE manifest INDENT_SIZE 4)
     _cool_vcpkg_code_stream(INCREMENT_INDENT APPEND VARIABLE manifest
-            VALUE "{\n\"$schema\": \"https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json\",\n\"dependencies\": [")
+        VALUE "{\n\"$schema\": \"https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json\",\n\"dependencies\": [")
     _cool_vcpkg_code_stream(INCREMENT_INDENT APPEND VARIABLE manifest VALUE "\n")
 
     # dependencies section
     set(append_comma FALSE)
     foreach(target IN LISTS write_vcpkg_manifest_file_TARGETS)
+
         if (append_comma)
             _cool_vcpkg_code_stream(APPEND VARIABLE manifest VALUE ",\n")
         endif()
         _cool_vcpkg_code_stream(INCREMENT_INDENT APPEND VARIABLE manifest VALUE "{\n\"name\": \"${target}\"")
-        if (NOT "${_cool_vcpkg_declared_package_${target}_version}" STREQUAL "")
-            _cool_vcpkg_code_stream(APPEND VARIABLE manifest
-                    VALUE ",\n\"version>=\": \"${_cool_vcpkg_declared_package_${target}_version}\""
-            )
+
+        _cool_vcpkg_code_stream(APPEND VARIABLE manifest VALUE ",\n\"default-features\": ")
+        if (_cool_vcpkg_declared_package_${target}_use_default_features)
+            _cool_vcpkg_code_stream(APPEND VARIABLE manifest VALUE "true")
+        else()
+            _cool_vcpkg_code_stream(APPEND VARIABLE manifest VALUE "false")
         endif()
-        list(LENGTH _cool_vcpkg_declared_package_${target}_features feature_count)
-        set(target_features_string "")
-        if (feature_count GREATER 0)
-            string(APPEND target_features_string ",\n\"features\": [ ")
-            foreach (feature IN LISTS _cool_vcpkg_declared_package_${target}_features)
-                string(APPEND target_features_string "\"${feature}\", ")
-            endforeach()
-            # remove trailing comma
-            string(LENGTH ${target_features_string} target_features_string_length)
-            math(EXPR substring_length "${target_features_string_length} - 2")
-            string(SUBSTRING ${target_features_string} 0 ${substring_length} target_features_string)
-            string(APPEND target_features_string " ]")
-            _cool_vcpkg_code_stream(APPEND VARIABLE manifest VALUE "${target_features_string}")
+
+        set(has_emitted_features FALSE)
+        foreach(feature IN LISTS _cool_vcpkg_declared_package_${target}_features)
+            if (NOT has_emitted_features)
+                _cool_vcpkg_code_stream(APPEND VARIABLE manifest VALUE ",\n\"features\": [")
+                _cool_vcpkg_code_stream(INCREMENT_INDENT APPEND VARIABLE manifest VALUE "\n")
+                set(has_emitted_features TRUE)
+            else()
+                _cool_vcpkg_code_stream(APPEND VARIABLE manifest VALUE ",\n")
+            endif()
+            _cool_vcpkg_code_stream(APPEND VARIABLE manifest VALUE "\"${feature}\"")
+        endforeach()
+        if (has_emitted_features)
+            _cool_vcpkg_code_stream(DECREMENT_INDENT APPEND VARIABLE manifest VALUE "\n]")
         endif()
+
+        # todo: there is a place for this version>= mechanism due to the trickiness with version formats not being
+        # comparable (even when it looks trivial) ill figure it out later. For now I've learned that the
+        # 'overrides' section works better because I'm guessing it does an exact string compare.
+        #        if (NOT "${_cool_vcpkg_declared_package_${target}_version}" STREQUAL "")
+        #            _cool_vcpkg_code_stream(APPEND VARIABLE manifest
+        #                    VALUE ",\n\"version>=\": \"${_cool_vcpkg_declared_package_${target}_version}\""
+        #            )
+        #        endif()
+
         _cool_vcpkg_code_stream(DECREMENT_INDENT APPEND VARIABLE manifest VALUE "\n}")
         set(append_comma TRUE)
     endforeach()
@@ -329,25 +345,24 @@ function(_cool_vcpkg_write_vcpkg_manifest_file)
 
     _cool_vcpkg_code_stream(APPEND VARIABLE manifest VALUE "\n\"builtin-baseline\": \"${builtin_baseline}\"")
 
-    # Still debating on whether or not to keep the dependency versions in an override section.
     # Overrides section
-    #    set(included_override_section FALSE)
-    #    foreach (target IN LISTS write_vcpkg_manifest_file_TARGETS)
-    #        if (NOT "${_cool_vcpkg_declared_package_${target}_version}" STREQUAL "")
-    #            if (NOT included_override_section)
-    #                _cool_vcpkg_code_stream(APPEND VARIABLE manifest VALUE ",\n\"overrides\": [")
-    #                set(included_override_section TRUE)
-    #            endif()
-    #            _cool_vcpkg_code_stream(INCREMENT_INDENT APPEND VARIABLE manifest VALUE "\n{")
-    #            _cool_vcpkg_code_stream(INCREMENT_INDENT APPEND VARIABLE manifest
-    #                    VALUE "\n\"name\": \"${target}\",\n\"version\": \"${_cool_vcpkg_declared_package_${target}_version}\"")
-    #            _cool_vcpkg_code_stream(DECREMENT_INDENT APPEND VARIABLE manifest VALUE "\n}")
-    #        endif()
-    #    endforeach()
-    #
-    #    if (included_override_section)
-    #        _cool_vcpkg_code_stream(DECREMENT_INDENT APPEND VARIABLE manifest VALUE "\n]")
-    #    endif()
+    set(included_override_section FALSE)
+    foreach (target IN LISTS write_vcpkg_manifest_file_TARGETS)
+        if (NOT "${_cool_vcpkg_declared_package_${target}_version}" STREQUAL "")
+            if (NOT included_override_section)
+                _cool_vcpkg_code_stream(APPEND VARIABLE manifest VALUE ",\n\"overrides\": [")
+                set(included_override_section TRUE)
+            endif()
+            _cool_vcpkg_code_stream(INCREMENT_INDENT APPEND VARIABLE manifest VALUE "\n{")
+            _cool_vcpkg_code_stream(INCREMENT_INDENT APPEND VARIABLE manifest
+                    VALUE "\n\"name\": \"${target}\",\n\"version\": \"${_cool_vcpkg_declared_package_${target}_version}\"")
+            _cool_vcpkg_code_stream(DECREMENT_INDENT APPEND VARIABLE manifest VALUE "\n}")
+        endif()
+    endforeach()
+
+    if (included_override_section)
+        _cool_vcpkg_code_stream(DECREMENT_INDENT APPEND VARIABLE manifest VALUE "\n]")
+    endif()
 
     _cool_vcpkg_code_stream(DECREMENT_INDENT APPEND VARIABLE manifest VALUE "\n}")
 
@@ -400,7 +415,6 @@ function(_cool_vcpkg_write_vcpkg_custom_triplet_file)
     )
     _cool_vcpkg_code_stream(APPEND VARIABLE triplet_file VALUE "${fallback_logic}")
 
-    set(actually_create_file FALSE) # We only want to create the file if there are any customizations.
     # dependencies section
     foreach(target IN LISTS custom_triplet_file_TARGETS)
         set(has_customizations FALSE)
@@ -433,28 +447,22 @@ function(_cool_vcpkg_write_vcpkg_custom_triplet_file)
 
         if (NOT has_customizations)
             _cool_vcpkg_code_stream(APPEND VARIABLE triplet_file VALUE "\n# This target does not have any customizations.")
-        else()
-            set(actually_create_file TRUE)
         endif()
 
         _cool_vcpkg_code_stream(DECREMENT_INDENT APPEND VARIABLE triplet_file VALUE "\nendif()\n\n")
 
     endforeach()
 
-    if (NOT actually_create_file)
-        message(DEBUG "No customizations to vcpkg targets were made, skipping custom triplet file generation.")
-        return()
-    endif()
-
     set(_cool_vcpkg_custom_triplet_path "${_cool_vcpkg_build_local_directory}/custom-triplets/" CACHE INTERNAL
             "Path to where the generated custom triplets live. This is what enables us to easily choose the linkages and bitness of our targets." FORCE)
     _cool_vcpkg_normalize_path(PATH "${_cool_vcpkg_custom_triplet_path}" OUTPUT_VARIABLE _cool_vcpkg_custom_triplet_path)
 
     _cool_vcpkg_code_stream(GET VARIABLE triplet_file OUTPUT_VARIABLE custom_triplet_output)
-    fiLe(CONFIGURE
-            OUTPUT ${_cool_vcpkg_custom_triplet_path}/cool-vcpkg-custom-triplet.cmake
-            CONTENT "${custom_triplet_output}"
-            @ONLY
+    fiLe(
+        CONFIGURE
+        OUTPUT ${_cool_vcpkg_custom_triplet_path}/cool-vcpkg-custom-triplet.cmake
+        CONTENT "${custom_triplet_output}"
+        @ONLY
     )
 
 endfunction()
@@ -845,7 +853,7 @@ macro(_cool_vcpkg_declare_package)
             PRIVATE_FUNCTION_NAME "_cool_vcpkg_declare_package" OUTPUT_VARIABLE args
     )
 
-    set(oneValueArgs NAME PORT_OVERLAY_LOCATION TARGET_ARCHITECTURE CRT_LINKAGE LIBRARY_LINKAGE VERSION)
+    set(oneValueArgs NAME PORT_OVERLAY_LOCATION TARGET_ARCHITECTURE CRT_LINKAGE LIBRARY_LINKAGE VERSION USE_DEFAULT_FEATURES)
     set(multiValueArgs TRIPLETS FEATURES)
     cmake_parse_arguments(declare_package "${options}" "${oneValueArgs}" "${multiValueArgs}" ${args})
 
@@ -855,17 +863,18 @@ macro(_cool_vcpkg_declare_package)
         message(FATAL_ERROR "DeclarePackage() requires a NAME argument. ${usage_help_text}")
     endif()
 
+    if ((NOT DEFINED declare_package_USE_DEFAULT_FEATURES) OR (declare_package_NAME STREQUAL ""))
+        set(declare_package_USE_DEFAULT_FEATURES TRUE)
+    endif()
+
     list(APPEND _cool_vcpkg_declared_packages ${declare_package_NAME})
 
-    set(_cool_vcpkg_declared_package_${declare_package_NAME}_version "${declare_package_VERSION}" CACHE STRING INTERNAL FORCE)
-    set(_cool_vcpkg_declared_package_${declare_package_NAME}_target_architecture "${declare_package_TARGET_ARCHITECTURE}" CACHE STRING INTERNAL FORCE)
-    set(_cool_vcpkg_declared_package_${declare_package_NAME}_crt_linkage "${declare_package_CRT_LINKAGE}" CACHE STRING INTERNAL FORCE)
-    set(_cool_vcpkg_declared_package_${declare_package_NAME}_library_linkage "${declare_package_LIBRARY_LINKAGE}" CACHE STRING INTERNAL FORCE)
-
-    set(_cool_vcpkg_declared_package_${declare_package_NAME}_features "" CACHE STRING INTERNAL FORCE)
-    foreach (feature IN LISTS declare_package_FEATURES)
-        list(APPEND _cool_vcpkg_declared_package_${declare_package_NAME}_features ${feature})
-    endforeach()
+    set(_cool_vcpkg_declared_package_${declare_package_NAME}_version "${declare_package_VERSION}" CACHE INTERNAL "" FORCE)
+    set(_cool_vcpkg_declared_package_${declare_package_NAME}_use_default_features "${declare_package_USE_DEFAULT_FEATURES}" CACHE INTERNAL "" FORCE)
+    set(_cool_vcpkg_declared_package_${declare_package_NAME}_features "${declare_package_FEATURES}" CACHE INTERNAL "" FORCE)
+    set(_cool_vcpkg_declared_package_${declare_package_NAME}_target_architecture "${declare_package_TARGET_ARCHITECTURE}" CACHE INTERNAL "" FORCE)
+    set(_cool_vcpkg_declared_package_${declare_package_NAME}_crt_linkage "${declare_package_CRT_LINKAGE}" CACHE INTERNAL "" FORCE)
+    set(_cool_vcpkg_declared_package_${declare_package_NAME}_library_linkage "${declare_package_LIBRARY_LINKAGE}" CACHE INTERNAL "" FORCE)
 
 endmacro()
 
