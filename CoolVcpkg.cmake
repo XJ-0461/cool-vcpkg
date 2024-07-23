@@ -186,15 +186,17 @@ function(_cool_vcpkg_check_latest_release_info)
 
     if (NOT DEFINED _cool_vcpkg_latest_version OR _cool_vcpkg_latest_version STREQUAL "")
         set(api_url "https://api.github.com/repos/XJ-0461/cool-vcpkg/releases/latest")
-        file(DOWNLOAD ${api_url} ${CMAKE_CURRENT_BINARY_DIR}/cool_vcpkg_latest_release_info.json
-                STATUS download_status
-                TIMEOUT 10
+        file(
+            DOWNLOAD ${api_url} ${CMAKE_CURRENT_BINARY_DIR}/cool_vcpkg_latest_release_info.json
+            STATUS download_status
+            TIMEOUT 10
         )
         file(READ ${CMAKE_CURRENT_BINARY_DIR}/cool_vcpkg_latest_release_info.json latest_release_info)
-        string(JSON latest_version_string
-                ERROR_VARIABLE latest_version_string_error
-                GET "${latest_release_info}"
-                "tag_name"
+        string(
+            JSON latest_version_string
+            ERROR_VARIABLE latest_version_string_error
+            GET "${latest_release_info}"
+            "tag_name"
         )
         if (NOT latest_version_string STREQUAL "NOTFOUND")
             string(SUBSTRING "${latest_version_string}" 1 -1 latest_version_string)
@@ -203,7 +205,7 @@ function(_cool_vcpkg_check_latest_release_info)
         endif()
 
         set(_cool_vcpkg_latest_version "${latest_version_string}" CACHE INTERNAL
-                "The latest version of cool-vcpkg from the github repo. Defaults to 0.0.0 if there was an error" FORCE
+            "The latest version of cool-vcpkg from the github repo. Defaults to 0.0.0 if there was an error" FORCE
         )
     endif()
 
@@ -225,7 +227,7 @@ endmacro()
 function(_cool_vcpkg_write_vcpkg_configuration_file)
 
     _cool_vcpkg_check_guarded(ARGUMENTS ${ARGV} PUBLIC_FUNCTION_NAME "cool_vcpkg_WriteVcpkgConfigurationFile"
-            PRIVATE_FUNCTION_NAME "_cool_vcpkg_write_vcpkg_configuration_file" OUTPUT_VARIABLE args
+        PRIVATE_FUNCTION_NAME "_cool_vcpkg_write_vcpkg_configuration_file" OUTPUT_VARIABLE args
     )
 
     set(multiValueArgs OVERLAY_TRIPLETS_PATHS)
@@ -234,16 +236,11 @@ function(_cool_vcpkg_write_vcpkg_configuration_file)
     set(config_file "")
     _cool_vcpkg_code_stream(SET_INDENT_SIZE VARIABLE config_file INDENT_SIZE 4)
     _cool_vcpkg_code_stream(INCREMENT_INDENT APPEND VARIABLE config_file
-            VALUE "{\n\"$schema\": \"https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg-configuration.schema.json\",\n\"overlay-triplets\": ["
+        VALUE "{\n\"$schema\": \"https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg-configuration.schema.json\",\n\"overlay-triplets\": ["
     )
     _cool_vcpkg_code_stream(INCREMENT_INDENT APPEND VARIABLE config_file VALUE "\n")
 
     # Vcpkg Configuration section
-    list(LENGTH vcpkg_config_file_OVERLAY_TRIPLETS_PATHS overlay_triplets_count)
-    if (overlay_triplets_count GREATER 0)
-        set(actually_create_file TRUE)
-    endif()
-
     set(append_comma FALSE)
     foreach (overlay_triplet_path IN LISTS vcpkg_config_file_OVERLAY_TRIPLETS_PATHS)
         if (append_comma)
@@ -256,10 +253,11 @@ function(_cool_vcpkg_write_vcpkg_configuration_file)
     _cool_vcpkg_code_stream(DECREMENT_INDENT APPEND VARIABLE config_file VALUE "\n}")
 
     _cool_vcpkg_code_stream(GET VARIABLE config_file OUTPUT_VARIABLE config_file_output)
-    fiLe(CONFIGURE
-            OUTPUT ${_cool_vcpkg_manifest_path}/vcpkg-configuration.json
-            CONTENT "${config_file_output}"
-            @ONLY
+    fiLe(
+        CONFIGURE
+        OUTPUT ${_cool_vcpkg_manifest_path}/vcpkg-configuration.json
+        CONTENT "${config_file_output}"
+        @ONLY
     )
 
 endfunction()
@@ -274,7 +272,7 @@ endmacro()
 function(_cool_vcpkg_write_vcpkg_manifest_file)
 
     _cool_vcpkg_check_guarded(ARGUMENTS ${ARGV} PUBLIC_FUNCTION_NAME "cool_vcpkg_WriteVcpkgManifestFile"
-            PRIVATE_FUNCTION_NAME "_cool_vcpkg_write_vcpkg_manifest_file" OUTPUT_VARIABLE args
+        PRIVATE_FUNCTION_NAME "_cool_vcpkg_write_vcpkg_manifest_file" OUTPUT_VARIABLE args
     )
 
     set(oneValueArgs BUILTIN_BASELINE)
@@ -296,7 +294,7 @@ function(_cool_vcpkg_write_vcpkg_manifest_file)
     set(manifest "")
     _cool_vcpkg_code_stream(SET_INDENT_SIZE VARIABLE manifest INDENT_SIZE 4)
     _cool_vcpkg_code_stream(INCREMENT_INDENT APPEND VARIABLE manifest
-            VALUE "{\n\"$schema\": \"https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json\",\n\"dependencies\": [")
+        VALUE "{\n\"$schema\": \"https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json\",\n\"dependencies\": [")
     _cool_vcpkg_code_stream(INCREMENT_INDENT APPEND VARIABLE manifest VALUE "\n")
 
     # dependencies section
@@ -417,7 +415,6 @@ function(_cool_vcpkg_write_vcpkg_custom_triplet_file)
     )
     _cool_vcpkg_code_stream(APPEND VARIABLE triplet_file VALUE "${fallback_logic}")
 
-    set(actually_create_file FALSE) # We only want to create the file if there are any customizations.
     # dependencies section
     foreach(target IN LISTS custom_triplet_file_TARGETS)
         set(has_customizations FALSE)
@@ -450,28 +447,22 @@ function(_cool_vcpkg_write_vcpkg_custom_triplet_file)
 
         if (NOT has_customizations)
             _cool_vcpkg_code_stream(APPEND VARIABLE triplet_file VALUE "\n# This target does not have any customizations.")
-        else()
-            set(actually_create_file TRUE)
         endif()
 
         _cool_vcpkg_code_stream(DECREMENT_INDENT APPEND VARIABLE triplet_file VALUE "\nendif()\n\n")
 
     endforeach()
 
-    if (NOT actually_create_file)
-        message(DEBUG "No customizations to vcpkg targets were made, skipping custom triplet file generation.")
-        return()
-    endif()
-
     set(_cool_vcpkg_custom_triplet_path "${_cool_vcpkg_build_local_directory}/custom-triplets/" CACHE INTERNAL
             "Path to where the generated custom triplets live. This is what enables us to easily choose the linkages and bitness of our targets." FORCE)
     _cool_vcpkg_normalize_path(PATH "${_cool_vcpkg_custom_triplet_path}" OUTPUT_VARIABLE _cool_vcpkg_custom_triplet_path)
 
     _cool_vcpkg_code_stream(GET VARIABLE triplet_file OUTPUT_VARIABLE custom_triplet_output)
-    fiLe(CONFIGURE
-            OUTPUT ${_cool_vcpkg_custom_triplet_path}/cool-vcpkg-custom-triplet.cmake
-            CONTENT "${custom_triplet_output}"
-            @ONLY
+    fiLe(
+        CONFIGURE
+        OUTPUT ${_cool_vcpkg_custom_triplet_path}/cool-vcpkg-custom-triplet.cmake
+        CONTENT "${custom_triplet_output}"
+        @ONLY
     )
 
 endfunction()
