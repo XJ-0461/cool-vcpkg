@@ -347,16 +347,22 @@ function(_cool_vcpkg_write_vcpkg_manifest_file)
 
     # Overrides section
     set(included_override_section FALSE)
+    set(previous_override_appended FALSE)
     foreach (target IN LISTS write_vcpkg_manifest_file_TARGETS)
         if (NOT "${_cool_vcpkg_declared_package_${target}_version}" STREQUAL "")
             if (NOT included_override_section)
                 _cool_vcpkg_code_stream(APPEND VARIABLE manifest VALUE ",\n\"overrides\": [")
+                _cool_vcpkg_code_stream(INCREMENT_INDENT VARIABLE manifest)
                 set(included_override_section TRUE)
             endif()
-            _cool_vcpkg_code_stream(INCREMENT_INDENT APPEND VARIABLE manifest VALUE "\n{")
+            if (previous_override_appended)
+                _cool_vcpkg_code_stream(APPEND VARIABLE manifest VALUE ",")
+            endif()
+            _cool_vcpkg_code_stream(APPEND VARIABLE manifest VALUE "\n{")
             _cool_vcpkg_code_stream(INCREMENT_INDENT APPEND VARIABLE manifest
                     VALUE "\n\"name\": \"${target}\",\n\"version\": \"${_cool_vcpkg_declared_package_${target}_version}\"")
             _cool_vcpkg_code_stream(DECREMENT_INDENT APPEND VARIABLE manifest VALUE "\n}")
+            set(previous_override_appended TRUE)
         endif()
     endforeach()
 
