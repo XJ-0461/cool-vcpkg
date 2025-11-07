@@ -280,8 +280,8 @@ function(_cool_vcpkg_write_vcpkg_manifest_file)
     cmake_parse_arguments(write_vcpkg_manifest_file "${options}" "${oneValueArgs}" "${multiValueArgs}" ${args})
 
     set(builtin_baseline "f7423ee180c4b7f40d43402c2feb3859161ef625")
-    if (NOT _cool_vcpkg_current_commit_hash STREQUAL "")
-        set(builtin_baseline "${_cool_vcpkg_current_commit_hash}")
+    if (NOT _cool_vcpkg_current_baseline_hash STREQUAL "")
+        set(builtin_baseline "${_cool_vcpkg_current_baseline_hash}")
     else()
         message(WARNING "No commit hash could be determined for the current vcpkg checkout. This shouldn't be the case."
                 "Using builtin-baseline '${builtin_baseline}' a commit from June 14, 2024"
@@ -601,6 +601,7 @@ function(_cool_vcpkg_clone_vcpkg_repository)
 
 endfunction()
 
+# Get the current commit hash of the vcpkg repository that we checked out during the configure stage.
 function(_cool_vcpkg_find_current_commit_hash)
 
     set(_cool_vcpkg_current_commit_hash "" CACHE INTERNAL
@@ -619,6 +620,65 @@ function(_cool_vcpkg_find_current_commit_hash)
         set(_cool_vcpkg_current_commit_hash ${vcpkg_commit_hash} CACHE INTERNAL
                 "Commit hash of the vcpkg repository that we checked out during the configure stage" FORCE
         )
+    endif()
+
+endfunction()
+
+# Private
+# Get the HEAD commit hash of the public vcpkg github repo.
+function(_cool_vcpkg_update_to_latest_baseline_hash)
+
+    find_package(Git)
+    if (Git_FOUND)
+        # run process to get the current commit hash
+        message(STATUS "Getting commit hash from github.com/microsoft/vcpkg at HEAD.")
+        execute_process(
+            COMMAND ${GIT_EXECUTABLE} ls-remote origin HEAD
+            WORKING_DIRECTORY ${_cool_vcpkg_root_directory}/
+            OUTPUT_VARIABLE vcpkg_commit_hash
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        # Output will be in the form:
+        # 81aeb1591cde1SomeHash8b73a2cdf9b832	HEAD
+        # Extract just the commit hash (40 hex characters at the start)
+        message(STATUS "Full output from ls-remote: ${vcpkg_commit_hash}")
+        string(REGEX MATCH "^[0-9a-f]+" vcpkg_commit_hash "${vcpkg_commit_hash}")
+        message(STATUS "Extracted commit hash from ls-remote: ${vcpkg_commit_hash}")
+
+        if (DEFINED _cool_vcpkg_current_baseline_hash AND NOT _cool_vcpkg_current_baseline_hash STREQUAL "")
+            if (NOT _cool_vcpkg_current_baseline_hash STREQUAL vcpkg_commit_hash)
+                message(STATUS "Updating vcpkg baseline hash from ${_cool_vcpkg_current_baseline_hash} to ${vcpkg_commit_hash}.")
+            endif()
+        endif()
+
+        set(_cool_vcpkg_current_baseline_hash ${vcpkg_commit_hash} CACHE INTERNAL
+            "Commit hash of the vcpkg repository that we are using as 'baseline'" FORCE
+        )
+    endif()
+
+endfunction()
+
+# Fetch the repo at the baseline, so that vcpkg can work with it.
+function(_cool_vcpkg_fetch_baseline_commit)
+
+    find_package(Git)
+    if (Git_FOUND)
+        # run process to get the current commit hash
+        message(STATUS "Fetching baseline commit from github.com/microsoft/vcpkg")
+        execute_process(
+            COMMAND ${GIT_EXECUTABLE} fetch --depth=1 origin "${_cool_vcpkg_current_baseline_hash}"
+            WORKING_DIRECTORY ${_cool_vcpkg_root_directory}/
+            OUTPUT_VARIABLE fetch_output
+            ERROR_VARIABLE fetch_error
+            RESULT_VARIABLE fetch_result
+            OUTPUT_QUIET
+            ERROR_QUIET
+        )
+        # Don't show errors for lock file conflicts - when multiple cmake configurations run concurrently,
+        # only one needs to succeed. If the baseline is truly unavailable, vcpkg will error later.
+        if (fetch_result AND (NOT fetch_error MATCHES "shallow.lock"))
+            message(DEBUG "Git fetch returned code ${fetch_result}: ${fetch_error}")
+        endif()
     endif()
 
 endfunction()
@@ -655,13 +715,14 @@ endmacro()
 # _cool_vcpkg_using_shared_repository:             BOOL
 # _cool_vcpkg_toolchain_file:                      FILEPATH
 # _cool_vcpkg_current_commit_hash:                 STRING
+# _cool_vcpkg_current_baseline_hash:               STRING
 macro(_cool_vcpkg_set_up_vcpkg)
 
     _cool_vcpkg_check_guarded(ARGUMENTS "${ARGV}" PUBLIC_FUNCTION_NAME "cool_vcpkg_SetUpVcpkg"
             PRIVATE_FUNCTION_NAME "_cool_vcpkg_set_up_vcpkg" OUTPUT_VARIABLE args
     )
 
-    set(options COLLECT_METRICS)
+    set(options AUTO_UPDATE_BASELINE COLLECT_METRICS)
     set(oneValueArgs ROOT_DIRECTORY DEFAULT_TRIPLET CHAIN_LOAD_TOOLCHAIN)
     set(multiValueArgs OVERLAY_PORT_LOCATIONS)
     cmake_parse_arguments(bootstrap_vcpkg "${options}" "${oneValueArgs}" "${multiValueArgs}" "${args}")
@@ -737,6 +798,21 @@ macro(_cool_vcpkg_set_up_vcpkg)
             set(rebootstrap_vcpkg TRUE)
         endif()
 
+        # Only need to check AUTO_UPDATE_BASELINE if we are already bootstrapped.
+        if (bootstrap_vcpkg_AUTO_UPDATE_BASELINE)
+            message(STATUS "AUTO_UPDATE_BASELINE option is enabled, checking for updates.")
+            set(previous_baseline_hash "${_cool_vcpkg_current_baseline_hash}")
+            _cool_vcpkg_update_to_latest_baseline_hash()
+            # if current_baseline_hash is different from current_commit_hash, ensure we fetch the baseline hash.
+            if (NOT _cool_vcpkg_current_baseline_hash STREQUAL "" AND NOT _cool_vcpkg_current_commit_hash STREQUAL "")
+                if (NOT _cool_vcpkg_current_baseline_hash STREQUAL previous_baseline_hash)
+                    message(STATUS "AUTO_UPDATE_BASELINE detected a new baseline hash. Fetching baseline commit.")
+                    _cool_vcpkg_fetch_baseline_commit()
+#                    set(rebootstrap_vcpkg TRUE)
+                endif()
+            endif()
+        endif()
+
     endif (DEFINED _cool_vcpkg_is_bootstrapped)
 
     if (DEFINED _cool_vcpkg_root_directory)
@@ -808,6 +884,10 @@ macro(_cool_vcpkg_set_up_vcpkg)
             _cool_vcpkg_make_vcpkg_available()
         endif()
         _cool_vcpkg_find_current_commit_hash()
+        # Since we are bootstrapping, set the baseline hash to the current commit hash.
+        set(_cool_vcpkg_current_baseline_hash ${_cool_vcpkg_current_commit_hash} CACHE INTERNAL
+                "Commit hash of the vcpkg repository that we are using as 'baseline'" FORCE
+        )
 
         set(_cool_vcpkg_toolchain_file ${_cool_vcpkg_root_directory}scripts/buildsystems/vcpkg.cmake
                 CACHE FILEPATH "Computed path to the vcpkg toolchain file." FORCE)
