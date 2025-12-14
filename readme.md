@@ -1,63 +1,50 @@
 # Cool-Vcpkg
 
+Pure CMake module for a better Vcpkg experience.
+
 ## Overview
 
-A CMake module that provides a more idiomatic CMake experience for Vcpkg. It is designed to address some of the
-shortcomings of the vcpkg offering while staying completely within CMake-land.
+Cool-Vcpkg provides a more idiomatic CMake experience by:
+- Automatically bootstrapping (and optionally cloning) vcpkg
+- Generating the required vcpkg files (manifest/config + overlay triplet) per build configuration
+- Enabling per-port triplet customization without hand-authoring multiple toolchain/config variants
 
-Cool-Vcpkg is not intended to fragment the vcpkg ecosystem in any way. A design goal for the project is to live in
-complete harmony with, and default to, the official vcpkg workflow as much as possible. There is still work to be done
-to that end, but this project does not introduce any new standards, configuration files, anything whatsoever to vcpkg.
+Cool-Vcpkg does **not** replace vcpkg ports, registries, or baseline/versioning mechanisms. It only automates file
+generation and integration from CMake.
 
-We are only automating the generation and inclusion of Vcpkg configuration files.
-
-In my opinion, one of the main drawbacks of using vcpkg is the requirement to manually author separate configuration and
-manifest files for each build configuration. If you have multiple build configurations, one must first author each
-manifest and configuration file, decide where they should live, and when it comes to configuration time install the
-correct one to the CMAKE_BINARY_DIR (or wherever they wish to have their vcpkg_installed directory to be).
-This workflow was cumbersome and I wanted to only use CMake, so this automates a lot of that machinery.
-
-## Why should I use this?
+## Motivation
 
 It addresses some shortcomings of vcpkg, including:
 
 - Automatic Initialization
-  - Vcpkg will bootstrap itself if it doesn't detect a vcpkg executable in the VCPKG_ROOT directory. However, it will
-  not clone the vcpkg repository if it doesn't exist there.
+  - Vcpkg will bootstrap itself if it doesn't detect a vcpkg executable in the `VCPKG_ROOT` directory.
 - Versioning
-  - Versioning is only supported in manifest mode, so for all intents and purposes we are all locked into that workflow.
-  If we are using manifests, might as well make it comfortable.
+  - Versioning your dependencies is **only supported** in manifest mode. That means you're probably using manifest mode.
+  Automate the manifest mode details.
 - Per-Port Triplet Customization Awkwardness
-  - Vcpkg (foolishly) assumes that your want each of your targets to use the same triplet.
-  And if you don't want that, you will find yourself essentially writing toolchain files for each combination of those
+  - Vcpkg assumes that your want each of your targets to use the same triplet.
+  And if you don't want that, you will find yourself writing toolchain files for every combination of those
   dependencies. Yet another configuration file that you need to manage per-build.
 - Pre-`project()` Initialization
   - Vcpkg CMake integration expects that you set up everything vcpkg-related before the first call to `project()`.
   This is a bit annoying, because we like to have a `project()` call at the top of our CMakeLists.txt files. After, the
-  cmake_minimum_required() of course.
+  `cmake_minimum_required()` of course.
+- Yet Another Package Manager Configuration File
+  - Integrating vcpkg into your project means maintaining yet another configuration file and pre-build step in the build
+  process outside the CMake ecosystem. Requiring users to learn/clone/install vcpkg is a barrier to entry for new users.
 
 ## Usage Note
 
-Cool-Vcpkg is not intended to replace the 'Ports' system that vcpkg uses to build and distribute dependencies. This is a
-completely separate thing.
+This project is best suited for top-level CMake project or end-user applications.
+Check the [FAQ](#FAQ) for more details.
 
-This implementation is currently suited to top-level projects, which only pull in other dependencies. Cool-Vcpkg hasn't
-been tested in a project which is a dependency (subproject, subdirectory, vcpkg port, or otherwise). It is a design goal
-to support nested Cool-Vcpkg-ed project before a v1 release but there is still work and testing to be done on that
-front. Currently, if CMAKE_TOOLCHAIN_FILE is previously defined, Cool-Vcpkg will be disabled to prevent any potential
-frustration.
-
-If your project uses Cool-Vcpkg, and you are also offering a vcpkg port, you should just keep it simple and set
-`COOL_VCPKG_ENABLED` to `OFF` in your portfile. This workflow just has not been tested yet, and we don't want to
-complicate things.
-
-## Installation
+## Installation Options
 
 ### Clone from GitHub
 
-The builtin CMake `FetchContent` module can be used to pull in the latest version of cool-vcpkg from Github. Automatically
-adding the module location to the `CMAKE_MODULE_PATH` is an opt-in feature; use it by pointing to the `automatic-setup`
-source subdirectory.
+The builtin CMake `FetchContent` module can be used to pull in the latest version of cool-vcpkg from GitHub.
+Automatically adding the module location to the `CMAKE_MODULE_PATH` is an opt-in feature; use it by pointing to the
+`automatic-setup` source subdirectory.
 
 ```cmake
 # Pull in the latest version every time
@@ -65,14 +52,14 @@ include(FetchContent)
 FetchContent_Declare(
         cool_vcpkg_latest
         GIT_REPOSITORY  https://github.com/XJ-0461/cool-vcpkg.git
-        GIT_TAG         v0.1.2
+        GIT_TAG         v0.1.3
         SOURCE_SUBDIR   automatic-setup
 )
 FetchContent_MakeAvailable(cool_vcpkg_latest)
 include(CoolVcpkg)
 ```
 
-### Include in your project manually
+### Manually Include in Project
 
 You can simply add this module into your project somewhere (perhaps in a `cmake` directory?) and include as you normally
 would in your project. Enable the `COOL_VCPKG_CHECK_FOR_UPDATES` option to warn you if you are not using the latest
@@ -102,15 +89,16 @@ it will clone and bootstrap it for you.
 cool_vcpkg_SetUpVcpkg(
         COLLECT_METRICS
         DEFAULT_TRIPLET x64-linux # Uses static linkage by default
-        ROOT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/my-vcpkg
+        ROOT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/shared-location/my-vcpkg
 )
 ```
 > **Note**: The `DEFAULT_TRIPLET` must be one of the out-of-the-box triplets that vcpkg supports (including the
 > community triplets). The list of which can be found in the
 > [vcpkg repository](https://github.com/microsoft/vcpkg/tree/master/triplets) under `triplets/`.
 
-> **Note**: The `ROOT_DIRECTORY` specified above is in a shared location. If I have multiple build configurations
-> running concurrently, vcpkg will only be cloned and bootstrapped once. If one wanted (for whatever reason) to have a
+> **Note**: The `ROOT_DIRECTORY` specified above can be a shared location. If you have multiple build configurations
+> pointing to the same vcpkg root directory (e.g. debug/release, different platforms, or even different projects)
+> vcpkg will only be cloned and bootstrapped once. If one wanted (for whatever reason) to have a
 > separate vcpkg installation for each build they could use something like `${CMAKE_CURRENT_BINARY_DIR}/my-vcpkg`.
 
 Declare the packages that you want to install with `cool_vcpkg_DeclarePackage()`.
@@ -119,7 +107,7 @@ Declare the packages that you want to install with `cool_vcpkg_DeclarePackage()`
 cool_vcpkg_DeclarePackage(
         NAME cnats
         VERSION 3.8.2
-        LIBRARY_LINKAGE dynamic # Override x64-linux triplet linkage static -> dynamic
+        LIBRARY_LINKAGE dynamic # Override x64-linux triplet linkage: static -> dynamic
 )
 cool_vcpkg_DeclarePackage(NAME nlohmann-json)
 cool_vcpkg_DeclarePackage(NAME gtest)
@@ -184,6 +172,66 @@ cool_vcpkg_DeclarePackage(
 Please feel free to open an issue or pull request if you have any suggestions or improvements. Especially around
 developer experience, documentation, logging, and error messages.
 
+## FAQ
+
+### When should I use this?
+
+This implementation is currently suited to top-level projects, which only pull in other dependencies. Cool-Vcpkg hasn't
+been tested in a project which is a dependency (subproject, subdirectory, vcpkg port, or otherwise). It is a goal
+to ensure nested Cool-Vcpkg-ed project works before a v1 release but there is still work and testing to be done on that
+front. If you have a use case for this, please open an issue to discuss it. I'm open to contributions as well.
+
+### Can I use this in a vcpkg port?
+
+Currently, if CMAKE_TOOLCHAIN_FILE is previously defined, Cool-Vcpkg will be disabled to prevent any potential
+frustration.
+
+If your project uses Cool-Vcpkg, and you are also offering a vcpkg port, you should just keep it simple and set
+`COOL_VCPKG_ENABLED` to `OFF` in your portfile. This workflow just has not been tested, and we don't want to complicate
+things.
+
+### Version identifiers
+
+Prepend a `v` to the GIT_TAG version specifier in the `FetchContent_Declare()` call. Do **not** prepend the `v` in the
+`VERSION` argument to `cool_vcpkg_DeclarePackage()`.
+
+### Where do I find packages?
+
+[vcpkg.link](https://vcpkg.link/)
+
+### Anything else?
+
+I like driving my builds with `CMakePresets.json` files.
+
+`CMakeLists.txt`
+```cmake
+cool_vcpkg_DeclarePackage(
+        NAME soci
+        VERSION "${SociVersion}"
+        LIBRARY_LINKAGE "${SociLibraryLinkage}"
+        FEATURES "${SociFeatures}"
+)
+```
+
+`CMakePresets.json`
+
+```json
+{
+  "SociVersion": {
+    "type": "STRING",
+    "value": "4.0.3#3"
+  },
+  "SociLibraryLinkage": {
+    "type": "STRING",
+    "value": "dynamic"
+  },
+  "SociFeatures": {
+    "type": "STRING",
+    "value": "odbc;postgresql;sqlite3"
+  }
+}
+```
+
 ## Implementation Notes
 
 CMake doesn't do the whole 'public' and 'private' functions and variables thing.
@@ -194,11 +242,61 @@ CMake doesn't do the whole 'public' and 'private' functions and variables thing.
 
 ## Todo
 
-- Harmonious coexistence with official vcpkg offering
+- Continue to ensure harmonious coexistence with official vcpkg offering
   - Essentially, if there are top level VCPKG options set, we should respect those. For example, we are implicitly
   setting stuff like `VCPKG_MANIFEST_INSTALL`, `VCPKG_MANIFEST_DIR`, and `VCPKG_MANIFEST_MODE`. If these are already set
-  by the time we get to setting up the CoolVcpkg stuff, we should have behavior that respects them, and log it to the
+  by the time we get to setting up the Cool-Vcpkg stuff, we should have behavior that respects them, and log it to the
   user.
 - Nested cool-vcpkg enabled projects.
-  - If this doesn't work then the project is useless.
   - Lots of testing.
+
+## Quick Start
+
+```cmake
+cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
+
+project(
+    <YOUR_PROJECT_NAME>
+    VERSION 0.1.0
+    LANGUAGES CXX
+)
+
+include(FetchContent)
+FetchContent_Declare(
+        cool_vcpkg_latest
+        GIT_REPOSITORY  https://github.com/XJ-0461/cool-vcpkg.git
+        GIT_TAG         v0.1.3
+        SOURCE_SUBDIR   automatic-setup
+)
+FetchContent_MakeAvailable(cool_vcpkg_latest)
+include(CoolVcpkg)
+
+cool_vcpkg_SetUpVcpkg(
+    DEFAULT_TRIPLET x64-linux
+    ROOT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/node_modules_or_whatever"
+)
+
+cool_vcpkg_DeclarePackage(
+    NAME <DESIRED_PACKAGE>
+    VERSION <DESIRED_PACKAGE_VERSION>
+    FEATURES <OPTIONAL_FEATURE_LIST>
+)
+
+cool_vcpkg_InstallPackages()
+
+find_package(<DESIRED_PACKAGE_NAME_THAT_DOESNT_NECESSARILY_MATCH_VCPKG_PACKAGE_NAME> CONFIG REQUIRED)
+
+# ---- Create library ----
+
+add_executable(
+    simple-web-service
+    source/main.cpp
+)
+
+target_link_libraries(
+    simple-web-service
+    PRIVATE
+    Crow::Crow
+    nlohmann_json::nlohmann_json
+)
+```
