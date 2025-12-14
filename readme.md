@@ -12,6 +12,10 @@ Cool-Vcpkg provides a more idiomatic CMake experience by:
 Cool-Vcpkg does **not** replace vcpkg ports, registries, or baseline/versioning mechanisms. It only automates file
 generation and integration from CMake.
 
+## Examples
+
+[cool-vcpkg-examples](https://github.com/XJ-0461/cool-vcpkg-examples)
+
 ## Motivation
 
 It addresses some shortcomings of vcpkg, including:
