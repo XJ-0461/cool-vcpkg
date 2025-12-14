@@ -293,14 +293,13 @@ find_package(<DESIRED_PACKAGE_NAME_THAT_DOESNT_NECESSARILY_MATCH_VCPKG_PACKAGE_N
 # ---- Create library ----
 
 add_executable(
-    simple-web-service
+    <your_executable_name>
     source/main.cpp
 )
 
 target_link_libraries(
-    simple-web-service
+    <your_executable_name>
     PRIVATE
-    Crow::Crow
-    nlohmann_json::nlohmann_json
+        <PACKAGE_TARGET_NAMESPACE>::<PACKAGE_TARGET>
 )
 ```
